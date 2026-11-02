@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>云汐 · AI虚拟主播</title>
+<title>佳垚 · AI虚拟主播</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
   /* 竖屏 1080x1920，在 OBS 中添加“浏览器源”，宽1080 高1920 */
@@ -112,7 +112,7 @@
 </svg>
 
 <div id="stage">
-<!-- 原创形象「云汐」：程序化 SVG，便于直接运行。正式直播建议换成你自己委托/购买授权的 Live2D 或 3D 模型 -->
+<!-- 原创形象「佳垚」：程序化 SVG，便于直接运行。正式直播建议换成你自己委托/购买授权的 Live2D 或 3D 模型 -->
 <svg id="avatar" viewBox="0 0 600 900">
  <defs>
   <linearGradient id="hanfu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8f7f3"/><stop offset="1" stop-color="#9fd4c9"/></linearGradient>
@@ -218,7 +218,7 @@
 <div id="score" class="panel"><div class="ins"></div><div class="lyr"></div><div class="bars"></div></div>
 
 <div id="feed"></div>
-<div id="sub"><span class="name">云汐</span><div class="q"></div><div class="a">大家好，我是AI虚拟主播云汐～可以让我作诗、画画、唱歌、跳舞、弹琴哦！</div></div>
+<div id="sub"><span class="name">佳垚</span><div class="q"></div><div class="a">大家好，我是AI虚拟主播佳垚～可以让我作诗、画画、唱歌、跳舞、弹琴哦！</div></div>
 <div id="footer">AI 生成内容 · 请理性消费 · 未成年人请勿打赏</div>
 
 <script>
@@ -361,7 +361,7 @@ async function inkPainting(ctx, prompt) {
   // 太阳/月 + 题字 + 印章
   ctx.fillStyle = 'rgba(192,57,43,.75)'; ctx.beginPath(); ctx.arc(800, 200, 48, 0, 7); ctx.fill();
   ctx.fillStyle = '#222'; ctx.font = '56px KaiTi, STKaiti, serif'; [...prompt.slice(0, 8)].forEach((c, i) => ctx.fillText(c, 900, 200 + i * 66));
-  ctx.fillStyle = '#b8352b'; ctx.fillRect(895, 760, 72, 72); ctx.fillStyle = '#f4ecd8'; ctx.font = 'bold 30px serif'; ctx.fillText('云', 915, 790); ctx.fillText('汐', 915, 824);
+  ctx.fillStyle = '#b8352b'; ctx.fillRect(895, 760, 72, 72); ctx.fillStyle = '#f4ecd8'; ctx.font = 'bold 30px serif'; ctx.fillText('佳', 915, 790); ctx.fillText('垚', 915, 824);
   stampLabel(ctx, W);
 }
 async function showPaint(p) {

@@ -28,12 +28,12 @@ PROGRAM_PROMPTS = {
 ROLLCALL = [
     "{u}，你刚才说得很有意思，能再多讲讲吗？",
     "点名{u}！你最喜欢哪种乐器呀？",
-    "{u}今天过得怎么样？在公屏告诉云汐吧～",
+    "{u}今天过得怎么样？在公屏告诉佳垚吧～",
 ]
 
-WELCOME_NEW = ["欢迎{u}第一次来！我是AI虚拟主播云汐，可以点歌、点诗、点画哦～",
+WELCOME_NEW = ["欢迎{u}第一次来！我是AI虚拟主播佳垚，可以点歌、点诗、点画哦～",
                "{u}你好呀～新朋友可以在公屏打“作诗”“画画”“弹古筝”试试！"]
-WELCOME_BACK = ["{u}回来啦！上次我们聊到{t}，还记得吗？", "欢迎老朋友{u}，第{n}次来看云汐啦～"]
+WELCOME_BACK = ["{u}回来啦！上次我们聊到{t}，还记得吗？", "欢迎老朋友{u}，第{n}次来看佳垚啦～"]
 
 
 class Host:
@@ -71,7 +71,7 @@ class Host:
         return ""
 
     def gift_thanks(self, user: str, info: dict) -> str:
-        base = random.choice(["谢谢{u}的礼物，心意云汐收到啦～", "感谢{u}！"]).format(u=user)
+        base = random.choice(["谢谢{u}的礼物，心意佳垚收到啦～", "感谢{u}！"]).format(u=user)
         return base + "大家量力而行、理性消费，陪伴就是最好的支持哦。"
 
     def current_segment(self):
