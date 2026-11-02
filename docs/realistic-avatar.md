@@ -59,6 +59,19 @@
 
 把片段放进 `web/avatar/`，把 `clips.example.json` 复制成 `clips.json` 并改成你的文件名。
 
+### 用脚本自动生成（即梦）
+
+`scripts/jimeng_gen.py` 会调用即梦接口完成第一到第三步：
+
+```bash
+export VOLC_ACCESS_KEY=...  VOLC_SECRET_KEY=...
+python scripts/jimeng_gen.py portraits --n 8                         # 生成 8 张定妆照候选
+python scripts/jimeng_gen.py clips --portrait runtime_gen/portraits/p3.png   # 用选定的那张生成全部动作片段
+```
+
+片段直接存到 `web/avatar/`，并自动写好 `clips.json`。可以用 `--only dance_1 guzheng` 只重做某几条，用 `--dry-run` 先看请求不花钱。
+运行的机器需要能访问 `visual.volcengineapi.com` 和 `*.volces.com`。
+
 ### 第四步：口型同步
 
 写实人物说话时嘴型必须和声音对上，否则一眼假。推荐自建 **MuseTalk**（开源，RTX 4090 上可实时），或 LatentSync。
