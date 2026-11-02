@@ -29,6 +29,7 @@
   #stage { transition: transform .6s ease }
   body.panel-open #stage { transform: translateX(-250px) scale(.92) }
   /* 写实真人视频形象（?avatar=video）*/
+  #stage[hidden], #vstage[hidden] { display:none }
   #vstage { position:absolute; left:0; right:0; top:150px; height:1360px; overflow:hidden; transition: transform .6s ease }
   #vstage video { position:absolute; left:50%; top:0; height:100%; transform:translateX(-50%); opacity:0; transition: opacity .35s ease }
   body.panel-open #vstage { transform: translateX(-250px) scale(.92) }
@@ -310,7 +311,7 @@ function act(a, ms = 4000) {
    web/avatar/clips.json 列出每个动作对应的视频片段（同一个原创写实人物、同一机位、同一背景），
    例如 {"idle":["idle1.mp4","idle2.mp4"],"talk":["talk1.mp4"],"dance":["dance1.mp4"],"play":["guzheng.mp4"],...}
    说话时：若服务端配置了口型同步服务（LIPSYNC_URL），会播放按本句语音实时生成的口型视频；否则播放通用 talk 片段。 */
-const VA = { on: false, clips: {}, cur: 'idle', front: null, back: null };
+const VA = { on: false, clips: {}, cur: 'idle', front: null, back: null, gen: 0, pending: null, resume: 'idle', gesture: null };
 const VA_LOOP = ['idle', 'talk', 'dance', 'sing', 'play', 'paint'];
 async function vaInit() {
   if (params.get('avatar') !== 'video') return;
@@ -325,10 +326,13 @@ function vaSrc(name) { return /^(https?:|\/)/.test(name) ? name : '/web/avatar/'
 function vaPlay(a, src) {
   const list = VA.clips[a] || (a === 'sing' ? VA.clips.talk : null) || VA.clips.idle;
   const file = src || list[Math.random() * list.length | 0];
+  const gen = ++VA.gen; VA.pending = a;
   const v = VA.back; v.src = vaSrc(file); v.loop = !src && VA_LOOP.includes(a); v.currentTime = 0;
-  v.onended = () => { if (!v.loop) vaPlay(VA.resume || 'idle'); };
-  return v.play().then(() => { v.style.opacity = 1; VA.front.style.opacity = 0; [VA.front, VA.back] = [v, VA.front]; VA.back.pause(); VA.cur = a; })
-    .catch(e => { if (e.name !== 'AbortError') console.warn('视频播放失败', file, e.message); });
+  v.onended = () => { if (!v.loop && gen === VA.gen) vaPlay(VA.resume || 'idle'); };
+  return v.play().then(() => {
+    if (gen !== VA.gen) { v.pause(); return false; }   // 已被更新的切换取代
+    v.style.opacity = 1; VA.front.style.opacity = 0; [VA.front, VA.back] = [v, VA.front]; VA.back.pause(); VA.cur = a; VA.pending = null; return true;
+  }).catch(e => { if (e.name !== 'AbortError') console.warn('视频播放失败', file, e.message); return false; });
 }
 function vaAct(a) {
   a = a || 'idle';
@@ -349,12 +353,16 @@ const td = new Uint8Array(analyser.fftSize);
 
 /* ---------------- 语音 ---------------- */
 let audioEl = null;
-function speak(text, url, useBrowser, talkVideo) {
-  if (VA.on && text) { const back = VA.cur; VA.resume = back === 'talk' ? 'idle' : back; vaPlay('talk', talkVideo);
-    return speakAudio(text, url, useBrowser).then(() => {
-      if (VA.cur !== 'talk') return;
-      if (VA.gesture && VA.clips[VA.gesture]) { const g = VA.gesture; VA.gesture = null; vaPlay(g); } else vaPlay(VA.resume || 'idle'); }); }
-  return speakAudio(text, url, useBrowser);
+async function speak(text, url, useBrowser, talkVideo) {
+  if (!(VA.on && text)) return speakAudio(text, url, useBrowser);
+  // 说完话回到的状态只能是循环类动作（待机/跳舞/弹琴等），不能是挥手这类短动作
+  if (VA_LOOP.includes(VA.cur) && VA.cur !== 'talk') VA.resume = VA.cur;
+  const started = vaPlay('talk', talkVideo);
+  // 有口型视频时：等视频真正开始播放再出声，保证嘴型和声音同步；视频 3 秒内没起来就放弃口型视频，改用通用说话片段
+  if (talkVideo && !(await Promise.race([started, sleep(3000).then(() => false)]))) await vaPlay('talk');
+  await speakAudio(text, url, useBrowser);
+  if (VA.cur !== 'talk' && VA.pending !== 'talk') return;
+  if (VA.gesture && VA.clips[VA.gesture]) { const g = VA.gesture; VA.gesture = null; vaPlay(g); } else vaPlay(VA.resume || 'idle');
 }
 function speakAudio(text, url, useBrowser) {
   return new Promise(res => {
