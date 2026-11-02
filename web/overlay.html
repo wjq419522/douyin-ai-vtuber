@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>云汐 · AI虚拟主播</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  /* 竖屏 1080x1920，在 OBS 中添加“浏览器源”，宽1080 高1920 */
+  :root { --ink:#1f2a33; --jade:#7cc4b8; --jade2:#cfeee7; --red:#c0392b; --paper:#f6f1e4; }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  html,body { width:1080px; height:1920px; overflow:hidden; font-family:"Noto Serif SC","Source Han Serif SC","STKaiti","KaiTi",serif; }
+  body { background: radial-gradient(ellipse at 50% 30%, #fdfbf5 0%, #e9f3ef 45%, #c9e2dc 100%); position:relative; }
+  body.green { background:#00ff00 } /* ?green=1 绿幕抠像模式 */
+  .bg-mtn { position:absolute; inset:auto 0 0 0; height:900px; opacity:.35 }
+
+  /* ===== 合规：显著位置、全程常驻的 AI 标识（不可被其它元素遮挡）===== */
+  #ai-label { position:absolute; top:36px; left:36px; z-index:999; background:rgba(192,57,43,.92); color:#fff;
+    font:700 40px/1 "Noto Sans SC",sans-serif; padding:18px 26px; border-radius:14px; letter-spacing:2px;
+    box-shadow:0 4px 18px rgba(0,0,0,.2) }
+  #ai-label small { display:block; font-size:24px; font-weight:400; margin-top:8px; opacity:.95 }
+  #status { position:absolute; top:44px; right:36px; z-index:50; font:28px "Noto Sans SC",sans-serif; color:#355;
+    background:rgba(255,255,255,.7); padding:10px 18px; border-radius:30px }
+  #away { position:absolute; inset:0; z-index:900; display:none; align-items:center; justify-content:center;
+    background:rgba(20,30,35,.55); color:#fff; font-size:64px; letter-spacing:6px }
+  #away.on { display:flex }
+
+  #stage { position:absolute; left:0; right:0; top:180px; height:1300px; display:flex; justify-content:center }
+  #avatar { width:860px; height:1290px; }
+  #stage { transition: transform .6s ease }
+  body.panel-open #stage { transform: translateX(-250px) scale(.92) }
+  .panel { max-width:600px }
+
+  /* ===== 弹幕 ===== */
+  #feed { position:absolute; left:30px; bottom:470px; width:560px; display:flex; flex-direction:column; gap:12px; z-index:40 }
+  .dm { background:rgba(255,255,255,.78); border-radius:22px; padding:12px 20px; font:30px/1.35 "Noto Sans SC",sans-serif;
+    color:#234; animation: dmIn .35s ease-out; box-shadow:0 2px 8px rgba(0,0,0,.08) }
+  .dm b { color:#2b8a7e; margin-right:8px }
+  .dm.gift b { color:#c0392b }
+  @keyframes dmIn { from { transform:translateX(-40px); opacity:0 } }
+
+  /* ===== 字幕 ===== */
+  #sub { position:absolute; left:40px; right:40px; bottom:150px; min-height:260px; z-index:60; background:rgba(255,253,246,.92);
+    border:3px solid var(--jade); border-radius:28px; padding:28px 36px; font-size:44px; line-height:1.5; color:var(--ink);
+    box-shadow:0 10px 30px rgba(0,60,50,.15); }
+  #sub .q { font:28px "Noto Sans SC",sans-serif; color:#5a7d78; margin-bottom:10px }
+  #sub .name { position:absolute; top:-30px; left:40px; background:var(--jade); color:#fff; padding:6px 22px; border-radius:20px; font-size:30px }
+  #footer { position:absolute; bottom:40px; left:0; right:0; text-align:center; font:26px "Noto Sans SC",sans-serif; color:#466 }
+
+  /* ===== 诗 / 画 / 乐谱 面板 ===== */
+  .panel { position:absolute; z-index:70; top:250px; right:40px; background:var(--paper); border-radius:16px;
+    box-shadow:0 12px 40px rgba(0,0,0,.22); padding:30px; display:none; border:2px solid #d8cba8 }
+  .panel.on { display:block; animation: pop .4s ease-out }
+  @keyframes pop { from { transform:scale(.85); opacity:0 } }
+  #poem { height:720px; width:560px; padding:40px 30px }
+  #poem .t { display:flex; flex-direction:row-reverse; justify-content:center; gap:18px; height:100% }
+  #poem .t > div { display:flex; flex-direction:column; font-size:58px; line-height:1.18; color:#222 }
+  #poem .t > div.title { font-size:42px; color:var(--red); font-weight:700 }
+  #paint canvas { width:520px; height:520px; display:block; border-radius:6px }
+  #paint .cap { font-size:30px; text-align:center; margin-top:12px; color:#553 }
+  #score { width:560px }
+  #score .ins { font-size:40px; color:var(--red); margin-bottom:10px }
+  #score .lyr { font-size:42px; line-height:1.6; color:#333 }
+  #score .lyr span.on { color:var(--red) }
+  #score .bars { display:flex; gap:5px; height:160px; align-items:flex-end; margin-top:16px }
+  #score .bars i { flex:1; background:var(--jade); border-radius:4px 4px 0 0; transition:height .1s, background .1s }
+  #score .bars i.hit { background:var(--red) }
+
+  #unlock { position:absolute; z-index:1000; left:50%; top:50%; transform:translate(-50%,-50%); background:#fff; padding:30px 50px;
+    border-radius:20px; font-size:36px; box-shadow:0 10px 40px rgba(0,0,0,.3); cursor:pointer; display:none }
+
+  /* ===== 形象动作 ===== */
+  #avatar .sway { transform-origin:300px 880px; animation: breathe 4s ease-in-out infinite }
+  @keyframes breathe { 50% { transform: translateY(-6px) } }
+  #armL, #armR { transition: transform .5s ease }
+  #armL { transform-origin:205px 470px } #armR { transform-origin:395px 470px }
+  #head { transform-origin:300px 440px; transition: transform .4s }
+  #buyao { transform-origin:360px 120px; animation: swing 2.4s ease-in-out infinite }
+  @keyframes swing { 50% { transform: rotate(8deg) } }
+  #props > g { opacity:0; transition: opacity .4s }
+  .act-wave #armR { animation: wave .6s ease-in-out 4 }
+  @keyframes wave { 50% { transform: rotate(-120deg) } 0%,100% { transform: rotate(-100deg) } }
+  .act-nod #head { animation: nod .5s ease-in-out 2 }
+  @keyframes nod { 50% { transform: rotate(0) translateY(10px) } }
+  .act-shy #blush { opacity:1 !important } .act-shy #head { transform: rotate(-6deg) }
+  .act-think #head { transform: rotate(7deg) } .act-think #armR { transform: rotate(-150deg) }
+  .act-dance .sway { animation: dance 1.2s ease-in-out infinite }
+  @keyframes dance { 0%,100% { transform: rotate(-5deg) translateY(0) } 25% { transform: rotate(0) translateY(-30px) }
+                     50% { transform: rotate(5deg) translateY(0) } 75% { transform: rotate(0) translateY(-30px) } }
+  .act-dance #armL { animation: sleeveL 1.2s ease-in-out infinite } .act-dance #armR { animation: sleeveR 1.2s ease-in-out infinite }
+  @keyframes sleeveL { 0%,100% { transform: rotate(60deg) } 50% { transform: rotate(150deg) } }
+  @keyframes sleeveR { 0%,100% { transform: rotate(-150deg) } 50% { transform: rotate(-60deg) } }
+  .act-dance #ribbon { opacity:1 !important }
+  .act-sing #armL { transform: rotate(25deg) } .act-sing #armR { transform: rotate(-25deg) }
+  .act-sing .sway { animation: dance 2.4s ease-in-out infinite }
+  .act-play #armL, .act-play #armR { animation: strum .25s ease-in-out infinite alternate }
+  @keyframes strum { from { transform: rotate(-10deg) } to { transform: rotate(10deg) } }
+  .act-play #prop-zither { opacity:1 }
+  .act-paint #armR { animation: brush 1s ease-in-out infinite } .act-paint #prop-brush { opacity:1 }
+  @keyframes brush { 0%,100% { transform: rotate(-40deg) } 50% { transform: rotate(-65deg) } }
+  .act-poem #armR { transform: rotate(-60deg) } .act-poem #prop-fan { opacity:1 }
+</style>
+</head>
+<body>
+<div id="ai-label">AI生成 · 虚拟主播<small>本直播间形象与声音均由AI合成，由真人运营者负责</small></div>
+<div id="status">● 连接中</div>
+<div id="away">主播暂离 · 稍后回来</div>
+<div id="unlock">点击启用声音</div>
+
+<svg class="bg-mtn" viewBox="0 0 1080 900" preserveAspectRatio="none">
+  <path d="M0 520 C150 380 260 450 360 360 S560 300 680 400 S900 330 1080 420 V900 H0Z" fill="#8fb9b0"/>
+  <path d="M0 650 C180 560 300 620 460 540 S760 560 880 520 S1000 560 1080 540 V900 H0Z" fill="#6fa298"/>
+</svg>
+
+<div id="stage">
+<!-- 原创形象「云汐」：程序化 SVG，便于直接运行。正式直播建议换成你自己委托/购买授权的 Live2D 或 3D 模型 -->
+<svg id="avatar" viewBox="0 0 600 900">
+ <defs>
+  <linearGradient id="hanfu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8f7f3"/><stop offset="1" stop-color="#9fd4c9"/></linearGradient>
+  <linearGradient id="sleeve" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4fbf9"/><stop offset="1" stop-color="#b9e2da"/></linearGradient>
+  <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2733"/><stop offset="1" stop-color="#14131a"/></linearGradient>
+  <radialGradient id="skin" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#fff4ec"/><stop offset="1" stop-color="#f6dccd"/></radialGradient>
+  <radialGradient id="iris" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#7b5a44"/><stop offset="1" stop-color="#2b1a14"/></radialGradient>
+ </defs>
+ <g class="sway">
+  <!-- 后发 -->
+  <path d="M175 260 C150 420 160 640 190 820 L410 820 C440 640 450 420 425 260 Z" fill="url(#hair)"/>
+  <!-- 飘带 -->
+  <path id="ribbon" style="opacity:.0;transition:opacity .4s" d="M120 520 C60 600 140 680 70 780 M480 520 C540 600 460 680 530 780" stroke="#f3a6b4" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <!-- 身体 汉服 -->
+  <path d="M215 470 C230 450 370 450 385 470 L440 860 L160 860 Z" fill="url(#hanfu)"/>
+  <path d="M245 470 L300 600 L355 470" fill="none" stroke="#fff" stroke-width="16"/>
+  <path d="M250 470 L300 590 L350 470" fill="none" stroke="#c0392b" stroke-width="5"/>
+  <rect x="215" y="615" width="170" height="40" rx="6" fill="#f3a6b4"/>
+  <path d="M300 655 L285 760 M300 655 L318 770" stroke="#f3a6b4" stroke-width="7"/>
+  <!-- 左臂/广袖 -->
+  <g id="armL">
+   <path d="M210 470 C165 520 140 610 120 700 C150 730 200 720 225 690 C230 620 235 560 240 500 Z" fill="url(#sleeve)" stroke="#9fd4c9" stroke-width="3"/>
+   <ellipse cx="150" cy="705" rx="18" ry="14" fill="url(#skin)"/>
+  </g>
+  <!-- 右臂/广袖 -->
+  <g id="armR">
+   <path d="M390 470 C435 520 460 610 480 700 C450 730 400 720 375 690 C370 620 365 560 360 500 Z" fill="url(#sleeve)" stroke="#9fd4c9" stroke-width="3"/>
+   <ellipse cx="450" cy="705" rx="18" ry="14" fill="url(#skin)"/>
+   <g id="props">
+    <g id="prop-brush"><rect x="444" y="690" width="10" height="90" rx="4" fill="#7a5230"/><path d="M444 780 L454 780 L449 815Z" fill="#222"/></g>
+    <g id="prop-fan"><path d="M450 700 L400 610 A100 100 0 0 1 510 615 Z" fill="#fdf3e0" stroke="#c9a96e" stroke-width="3"/><path d="M420 640 Q455 625 490 640" stroke="#7cc4b8" stroke-width="4" fill="none"/></g>
+   </g>
+  </g>
+  <!-- 古筝道具 -->
+  <g id="prop-zither" style="opacity:0;transition:opacity .4s">
+   <path d="M90 720 L520 690 L530 740 L95 775 Z" fill="#9b5b34" stroke="#5e3218" stroke-width="4"/>
+   <g stroke="#f6e7c1" stroke-width="2"><line x1="110" y1="732" x2="515" y2="702"/><line x1="112" y1="742" x2="517" y2="712"/><line x1="114" y1="752" x2="519" y2="722"/><line x1="116" y1="762" x2="521" y2="732"/></g>
+  </g>
+  <!-- 脖子 -->
+  <rect x="283" y="430" width="34" height="50" rx="14" fill="#f3d6c6"/>
+  <!-- 头 -->
+  <g id="head">
+   <!-- 脸型：鹅蛋脸，下颌柔和 -->
+   <path d="M205 320 C205 240 250 205 300 205 C350 205 395 240 395 320 C395 385 370 440 300 470 C230 440 205 385 205 320Z" fill="url(#skin)"/>
+   <!-- 耳与耳坠 -->
+   <ellipse cx="203" cy="345" rx="10" ry="20" fill="#f3d6c6"/><ellipse cx="397" cy="345" rx="10" ry="20" fill="#f3d6c6"/>
+   <line x1="397" y1="363" x2="397" y2="392" stroke="#d4af37" stroke-width="2"/><circle cx="397" cy="397" r="6" fill="#e8f3f0" stroke="#d4af37" stroke-width="2"/>
+   <line x1="203" y1="363" x2="203" y2="392" stroke="#d4af37" stroke-width="2"/><circle cx="203" cy="397" r="6" fill="#e8f3f0" stroke="#d4af37" stroke-width="2"/>
+   <!-- 发髻（高髻） -->
+   <path d="M235 215 C220 150 270 115 300 118 C335 115 385 150 365 215 Z" fill="url(#hair)"/>
+   <ellipse cx="300" cy="140" rx="48" ry="30" fill="url(#hair)"/>
+   <!-- 中分刘海，自然垂落两侧 -->
+   <path d="M300 205 C260 205 220 230 208 290 C204 320 206 350 212 380 C220 330 235 285 262 255 C280 236 295 222 300 210 Z" fill="url(#hair)"/>
+   <path d="M300 205 C340 205 380 230 392 290 C396 320 394 350 388 380 C380 330 365 285 338 255 C320 236 305 222 300 210 Z" fill="url(#hair)"/>
+   <path d="M210 300 C200 380 205 440 222 500 L232 380Z M390 300 C400 380 395 440 378 500 L368 380Z" fill="url(#hair)"/>
+   <!-- 发簪 + 步摇 -->
+   <rect x="250" y="128" width="120" height="6" rx="3" fill="#d4af37" transform="rotate(-12 310 131)"/>
+   <circle cx="250" cy="142" r="9" fill="#e8f3f0" stroke="#d4af37" stroke-width="3"/>
+   <g id="buyao">
+    <line x1="360" y1="120" x2="395" y2="160" stroke="#d4af37" stroke-width="3"/>
+    <path d="M388 156 l8 -8 8 8 -8 8z" fill="#7cc4b8" stroke="#d4af37" stroke-width="2"/>
+    <line x1="396" y1="166" x2="396" y2="220" stroke="#d4af37" stroke-width="1.5"/><circle cx="396" cy="224" r="4.5" fill="#f2f2f2" stroke="#d4af37"/>
+    <line x1="388" y1="164" x2="384" y2="205" stroke="#d4af37" stroke-width="1.5"/><circle cx="384" cy="209" r="4" fill="#f3a6b4"/>
+   </g>
+   <!-- 远山眉：细长柔和 -->
+   <path d="M230 298 Q256 284 286 293" stroke="#4a3a36" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+   <path d="M314 293 Q344 284 370 298" stroke="#4a3a36" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+   <!-- 杏眼：自然比例，眼尾微扬 -->
+   <g id="eyes" style="transform-origin:300px 332px">
+    <path d="M230 335 Q258 311 290 329 Q262 350 230 335Z" fill="#fff"/>
+    <path d="M370 335 Q342 311 310 329 Q338 350 370 335Z" fill="#fff"/>
+    <clipPath id="eyeL"><path d="M230 335 Q258 311 290 329 Q262 350 230 335Z"/></clipPath>
+    <clipPath id="eyeR"><path d="M370 335 Q342 311 310 329 Q338 350 370 335Z"/></clipPath>
+    <circle cx="261" cy="332" r="13.5" fill="url(#iris)" clip-path="url(#eyeL)"/><circle cx="339" cy="332" r="13.5" fill="url(#iris)" clip-path="url(#eyeR)"/>
+    <circle cx="261" cy="332" r="5.5" fill="#1a100c" clip-path="url(#eyeL)"/><circle cx="339" cy="332" r="5.5" fill="#1a100c" clip-path="url(#eyeR)"/>
+    <circle cx="266" cy="327" r="3.2" fill="#fff"/><circle cx="344" cy="327" r="3.2" fill="#fff"/>
+    <circle cx="257" cy="338" r="1.5" fill="#fff" opacity=".7"/><circle cx="335" cy="338" r="1.5" fill="#fff" opacity=".7"/>
+    <path d="M227 336 Q258 306 292 328" stroke="#2a1d1d" stroke-width="3.6" fill="none" stroke-linecap="round"/>
+    <path d="M373 336 Q342 306 308 328" stroke="#2a1d1d" stroke-width="3.6" fill="none" stroke-linecap="round"/>
+    <path d="M238 314 Q262 302 286 312 M314 312 Q338 302 362 314" stroke="#d6b3a6" stroke-width="1.2" fill="none"/>
+    <path d="M240 342 Q262 351 286 336 M314 336 Q338 351 360 342" stroke="#c9a597" stroke-width="1.2" fill="none"/>
+   </g>
+   <!-- 花钿 -->
+   <path d="M300 262 c-4 6 -4 12 0 16 c4 -4 4 -10 0 -16z" fill="#c0392b"/>
+   <!-- 鼻 -->
+   <path d="M303 356 Q305 370 299 376 Q303 379 307 377" stroke="#d7a996" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+   <!-- 淡腮红 -->
+   <g id="blush" style="opacity:.25;transition:opacity .3s"><ellipse cx="245" cy="378" rx="20" ry="9" fill="#f59aa8"/><ellipse cx="355" cy="378" rx="20" ry="9" fill="#f59aa8"/></g>
+   <!-- 唇（口型同步：张嘴时露出 #mouth）-->
+   <ellipse id="mouth" cx="300" cy="412" rx="10" ry="2" fill="#7a2b34"/>
+   <g id="smile">
+    <path d="M286 410 Q293 404 300 407 Q307 404 314 410 Q300 414 286 410Z" fill="#c9505c"/>
+    <path d="M286 410 Q300 422 314 410 Q300 414 286 410Z" fill="#d86b75"/>
+   </g>
+  </g>
+  </g>
+ </g>
+</svg>
+</div>
+
+<div id="poem" class="panel"><div class="t"></div></div>
+<div id="paint" class="panel"><canvas width="1024" height="1024"></canvas><div class="cap"></div></div>
+<div id="score" class="panel"><div class="ins"></div><div class="lyr"></div><div class="bars"></div></div>
+
+<div id="feed"></div>
+<div id="sub"><span class="name">云汐</span><div class="q"></div><div class="a">大家好，我是AI虚拟主播云汐～可以让我作诗、画画、唱歌、跳舞、弹琴哦！</div></div>
+<div id="footer">AI 生成内容 · 请理性消费 · 未成年人请勿打赏</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+if (params.get('green')) document.body.classList.add('green');
+
+/* ---------------- 音频 ---------------- */
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+const master = AC.createGain(); master.gain.value = .8;
+const analyser = AC.createAnalyser(); analyser.fftSize = 512;
+const reverb = AC.createConvolver();
+(() => { const len = AC.sampleRate * 2.2, b = AC.createBuffer(2, len, AC.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 3); }
+  reverb.buffer = b; })();
+const wet = AC.createGain(); wet.gain.value = .25;
+master.connect(analyser); analyser.connect(AC.destination); master.connect(reverb); reverb.connect(wet); wet.connect(AC.destination);
+function ensureAudio() { if (AC.state === 'suspended') { $('#unlock').style.display = 'block'; AC.resume().then(() => $('#unlock').style.display = 'none'); } }
+$('#unlock').onclick = () => AC.resume().then(() => $('#unlock').style.display = 'none');
+
+const NOTE = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
+const freq = n => { const m = /^([A-G])(#?)(\d)$/.exec(n) || [0,'A','',4]; return 440 * Math.pow(2, (NOTE[m[1]] + (m[2]?1:0) + (m[3]-4)*12 - 9) / 12); };
+
+// Karplus-Strong 拨弦（古筝/琵琶/吉他/古琴）
+function pluck(f, t, dur, bright = .5, decay = .996) {
+  const sr = AC.sampleRate, len = Math.floor(sr * Math.min(dur + 1.5, 3)), buf = AC.createBuffer(1, len, sr), d = buf.getChannelData(0);
+  const N = Math.max(2, Math.round(sr / f)), ring = new Float32Array(N);
+  for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
+  let p = 0;
+  for (let i = 0; i < len; i++) { const nx = (p + 1) % N; const v = decay * ((1-bright) * ring[p] + bright * .5 * (ring[p] + ring[nx]));
+    d[i] = ring[p]; ring[p] = bright === .5 ? decay * .5 * (ring[p] + ring[nx]) : v; p = nx; }
+  const s = AC.createBufferSource(), g = AC.createGain(); s.buffer = buf; g.gain.value = .5; s.connect(g); g.connect(master); s.start(t);
+}
+// 钢琴：多泛音 + 指数衰减
+function piano(f, t, dur) {
+  [1, 2, 3, 4.01, 5.02].forEach((h, i) => { const o = AC.createOscillator(), g = AC.createGain();
+    o.frequency.value = f * h; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.22 / (i + 1), t + .005);
+    g.gain.exponentialRampToValueAtTime(.0001, t + Math.max(.6, dur * 2) / (1 + i * .4)); o.connect(g); g.connect(master); o.start(t); o.stop(t + 3); });
+}
+// 吹管/拉弦：笛子、箫、二胡（带揉弦颤音）
+function sustain(f, t, dur, type) {
+  const o = AC.createOscillator(), g = AC.createGain(), lfo = AC.createOscillator(), lg = AC.createGain(), flt = AC.createBiquadFilter();
+  o.type = type === 'erhu' ? 'sawtooth' : 'triangle'; o.frequency.value = f;
+  if (type === 'erhu') { o.frequency.setValueAtTime(f * .97, t); o.frequency.linearRampToValueAtTime(f, t + .08); }
+  lfo.frequency.value = type === 'erhu' ? 6 : 5; lg.gain.value = f * (type === 'erhu' ? .012 : .006); lfo.connect(lg); lg.connect(o.frequency);
+  flt.type = type === 'erhu' ? 'bandpass' : 'lowpass'; flt.frequency.value = type === 'erhu' ? 1400 : (type === 'xiao' ? 1200 : 3000); flt.Q.value = type === 'erhu' ? 1.2 : .7;
+  const peak = type === 'erhu' ? .35 : .3;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + .06); g.gain.setValueAtTime(peak, t + dur * .85); g.gain.linearRampToValueAtTime(0, t + dur);
+  o.connect(flt); flt.connect(g); g.connect(master); o.start(t); lfo.start(t); o.stop(t + dur + .05); lfo.stop(t + dur + .05);
+  // 气声
+  if (type !== 'erhu') { const n = AC.createBufferSource(), nb = AC.createBuffer(1, AC.sampleRate * dur, AC.sampleRate), nd = nb.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * .04; n.buffer = nb; const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f * 2;
+    n.connect(bp); bp.connect(master); n.start(t); }
+}
+// “哼唱”人声：锯齿波 + 共振峰滤波(元音 a)。真唱歌请接 DiffSinger / 训练自有音色的 SVC
+let singLevel = 0;
+function voice(f, t, dur) {
+  const o = AC.createOscillator(), g = AC.createGain(), lfo = AC.createOscillator(), lg = AC.createGain(); o.type = 'sawtooth'; o.frequency.value = f;
+  lfo.frequency.value = 5.5; lg.gain.value = f * .015; lfo.connect(lg); lg.connect(o.frequency);
+  const mix = AC.createGain(); mix.gain.value = .9;
+  [[800, 1, 8], [1150, .5, 9], [2900, .25, 10]].forEach(([fr, gn, q]) => { const b = AC.createBiquadFilter(); b.type = 'bandpass'; b.frequency.value = fr; b.Q.value = q;
+    const bg = AC.createGain(); bg.gain.value = gn * 2.2; o.connect(b); b.connect(bg); bg.connect(mix); });
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.5, t + .05); g.gain.setValueAtTime(.5, t + dur * .8); g.gain.linearRampToValueAtTime(0, t + dur);
+  mix.connect(g); g.connect(master); o.start(t); lfo.start(t); o.stop(t + dur + .05); lfo.stop(t + dur + .05);
+}
+const INST = {
+  guzheng: { name:'古筝', fn:(f,t,d)=>pluck(f,t,d,.5,.997) }, pipa: { name:'琵琶', fn:(f,t,d)=>{ for (let k=0;k<Math.max(1,Math.round(d*6));k++) pluck(f,t+k/12,.3,.5,.993); } },
+  guitar: { name:'吉他', fn:(f,t,d)=>pluck(f/2,t,d,.5,.995) }, guqin: { name:'古琴', fn:(f,t,d)=>pluck(f/2,t,d,.5,.9985) },
+  piano: { name:'钢琴', fn:piano }, dizi: { name:'笛子', fn:(f,t,d)=>sustain(f,t,d,'dizi') },
+  xiao: { name:'箫', fn:(f,t,d)=>sustain(f/2,t,d,'xiao') }, erhu: { name:'二胡', fn:(f,t,d)=>sustain(f/2,t,d,'erhu') },
+};
+
+/* ---------------- 形象控制 ---------------- */
+const av = $('#avatar');
+let actTimer;
+function act(a, ms = 4000) { av.setAttribute('class', 'act-' + a); clearTimeout(actTimer); if (ms) actTimer = setTimeout(() => av.setAttribute('class', ''), ms); }
+setInterval(() => { const e = $('#eyes'); e.style.transform = 'scaleY(.1)'; setTimeout(() => e.style.transform = '', 120); }, 3200 + Math.random() * 1500);
+let speaking = 0, fakeMouth = false;
+const td = new Uint8Array(analyser.fftSize);
+(function mouthLoop() {
+  analyser.getByteTimeDomainData(td); let s = 0; for (const v of td) s += (v - 128) ** 2;
+  let lvl = Math.min(1, Math.sqrt(s / td.length) / 30);
+  if (fakeMouth) lvl = .3 + .5 * Math.abs(Math.sin(performance.now() / 90));
+  speaking += (lvl - speaking) * .4;
+  $('#mouth').setAttribute('ry', 2 + speaking * 16); $('#smile').style.opacity = speaking > .15 ? .35 : 1;
+  requestAnimationFrame(mouthLoop);
+})();
+
+/* ---------------- 语音 ---------------- */
+let audioEl = null;
+function speak(text, url, useBrowser) {
+  return new Promise(res => {
+    if (url) {
+      audioEl = new Audio(url); audioEl.crossOrigin = 'anonymous';
+      const src = AC.createMediaElementSource(audioEl); src.connect(master);
+      audioEl.onended = res; audioEl.onerror = res; audioEl.play().catch(() => { ensureAudio(); res(); });
+    } else if (useBrowser && 'speechSynthesis' in window) {
+      const u = new SpeechSynthesisUtterance(text); u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.25;
+      const v = speechSynthesis.getVoices().find(v => /zh/i.test(v.lang) && /female|xiao|ting|mei|yaoyao|huihui/i.test(v.name)); if (v) u.voice = v;
+      fakeMouth = true; const done = () => { fakeMouth = false; res(); };
+      u.onend = done; u.onerror = done; setTimeout(done, 400 + text.length * 260); speechSynthesis.speak(u);
+    } else { fakeMouth = true; setTimeout(() => { fakeMouth = false; res(); }, 300 + text.length * 180); }
+  });
+}
+
+/* ---------------- 作诗 ---------------- */
+async function showPoem(p) {
+  const box = $('#poem .t'); box.innerHTML = '<div class="title">' + [...(p.title || '无题')].map(c => `<span>${esc(c)}</span>`).join('') + '</div>';
+  $('#poem').classList.add('on');
+  for (const line of p.lines || []) { const div = document.createElement('div'); box.appendChild(div);
+    for (const ch of line) { const sp = document.createElement('span'); sp.textContent = ch; div.appendChild(sp); await sleep(120); } }
+  setTimeout(() => $('#poem').classList.remove('on'), 12000);
+}
+
+/* ---------------- 作画 ---------------- */
+function rnd(seed) { let s = 0; for (const c of seed) s = (s * 31 + c.charCodeAt(0)) >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+function stampLabel(ctx, W) { // 显式标识：画作上直接写“AI生成”
+  ctx.save(); ctx.fillStyle = 'rgba(192,57,43,.9)'; ctx.fillRect(W - 210, 24, 186, 64); ctx.fillStyle = '#fff'; ctx.font = 'bold 40px sans-serif'; ctx.fillText('AI生成', W - 180, 70); ctx.restore(); }
+async function inkPainting(ctx, prompt) {
+  const W = 1024, H = 1024, r = rnd(prompt); ctx.fillStyle = '#f4ecd8'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 3000; i++) { ctx.fillStyle = `rgba(120,100,60,${r() * .04})`; ctx.fillRect(r() * W, r() * H, 2, 2); }
+  // 远山 → 近山，逐层“晕染”出来
+  for (let L = 0; L < 5; L++) {
+    const base = 380 + L * 120, amp = 220 - L * 30, dark = 0.12 + L * 0.13;
+    for (let pass = 0; pass < 14; pass++) {
+      ctx.beginPath(); ctx.moveTo(0, H);
+      for (let x = 0; x <= W; x += 8) { const y = base - amp * Math.abs(Math.sin(x / (150 + L * 40) + L * 2 + r() * .02)) * (.6 + .4 * Math.sin(x / 70 + L)) - pass * 3; ctx.lineTo(x, y + r() * 6); }
+      ctx.lineTo(W, H); ctx.closePath(); const g = ctx.createLinearGradient(0, base - amp, 0, base + 160);
+      g.addColorStop(0, `rgba(30,35,40,${dark * .12})`); g.addColorStop(1, 'rgba(30,35,40,0)'); ctx.fillStyle = g; ctx.fill();
+    }
+    // 云雾
+    const m = ctx.createLinearGradient(0, base + 20, 0, base + 140); m.addColorStop(0, 'rgba(244,236,216,0)'); m.addColorStop(.5, 'rgba(244,236,216,.85)'); m.addColorStop(1, 'rgba(244,236,216,0)');
+    ctx.fillStyle = m; ctx.fillRect(0, base + 20, W, 120); await sleep(350);
+  }
+  // 松枝 & 小舟
+  ctx.strokeStyle = 'rgba(20,20,20,.85)'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(60, 1024); ctx.bezierCurveTo(120, 820, 90, 700, 220, 600); ctx.stroke();
+  for (let i = 0; i < 26; i++) { const x = 120 + r() * 200, y = 600 + r() * 260; ctx.fillStyle = 'rgba(30,50,40,.55)'; ctx.beginPath(); ctx.ellipse(x, y, 40, 12, -.3, 0, 7); ctx.fill(); await sleep(15); }
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.moveTo(620, 860); ctx.quadraticCurveTo(680, 885, 760, 860); ctx.lineTo(745, 872); ctx.quadraticCurveTo(680, 890, 635, 872); ctx.fill();
+  ctx.fillRect(688, 820, 4, 44);
+  // 太阳/月 + 题字 + 印章
+  ctx.fillStyle = 'rgba(192,57,43,.75)'; ctx.beginPath(); ctx.arc(800, 200, 48, 0, 7); ctx.fill();
+  ctx.fillStyle = '#222'; ctx.font = '56px KaiTi, STKaiti, serif'; [...prompt.slice(0, 8)].forEach((c, i) => ctx.fillText(c, 900, 200 + i * 66));
+  ctx.fillStyle = '#b8352b'; ctx.fillRect(895, 760, 72, 72); ctx.fillStyle = '#f4ecd8'; ctx.font = 'bold 30px serif'; ctx.fillText('云', 915, 790); ctx.fillText('汐', 915, 824);
+  stampLabel(ctx, W);
+}
+async function showPaint(p) {
+  const c = $('#paint canvas'), ctx = c.getContext('2d'); $('#paint .cap').textContent = `「${p.prompt}」 · AI作画`; $('#paint').classList.add('on');
+  if (p.image) { const img = new Image(); img.crossOrigin = 'anonymous'; img.src = p.image; await img.decode().catch(() => {}); ctx.drawImage(img, 0, 0, 1024, 1024); stampLabel(ctx, 1024); }
+  else await inkPainting(ctx, p.prompt || '山水');
+  setTimeout(() => $('#paint').classList.remove('on'), 15000);
+}
+
+/* ---------------- 演奏 / 唱歌 ---------------- */
+async function playScore({ notes = [], bpm = 90, inst = 'guzheng', lyrics = null, title = '' }) {
+  ensureAudio();
+  const bars = $('#score .bars'); bars.innerHTML = notes.map(() => '<i></i>').join('');
+  $('#score .ins').textContent = lyrics ? `♪ ${title || '原创小调'}（AI演唱）` : `♫ ${INST[inst]?.name || inst} · AI演奏`;
+  const words = lyrics ? lyrics.join('，') : ''; $('#score .lyr').innerHTML = [...words].map(c => `<span>${c}</span>`).join('');
+  $('#score').classList.add('on');
+  const beat = 60 / bpm, t0 = AC.currentTime + .15, spans = [...$('#score .lyr').children].filter(s => s.textContent !== '，'); let t = t0;
+  notes.forEach(([n, b], i) => {
+    const f = freq(n), d = b * beat;
+    if (lyrics) { voice(f, t, d * .95); if (i % 2 === 0) pluck(f / 2, t, d, .5, .996); } else INST[inst]?.fn(f, t, d);
+    const bar = bars.children[i]; setTimeout(() => { bar.style.height = (30 + (f - 500) / 8) + 'px'; bar.classList.add('hit');
+      spans.forEach((s, k) => s.classList.toggle('on', k <= Math.floor(i * spans.length / notes.length))); }, (t - AC.currentTime) * 1000);
+    t += d;
+  });
+  await sleep((t - AC.currentTime) * 1000 + 600);
+  setTimeout(() => $('#score').classList.remove('on'), 2500);
+}
+
+/* ---------------- 字幕 & 弹幕 ---------------- */
+function addDm(m) { const d = document.createElement('div'); d.className = 'dm ' + m.kind; d.innerHTML = `<b>${esc(m.user)}</b>${esc(m.text)}`;
+  const f = $('#feed'); f.appendChild(d); while (f.children.length > 6) f.firstChild.remove(); }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ---------------- 演出队列 ---------------- */
+const jobs = []; let busy = false, stopped = false;
+new MutationObserver(() => document.body.classList.toggle('panel-open', !!document.querySelector('.panel.on')))
+  .observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+async function run() {
+  if (busy) return; busy = true;
+  while (jobs.length && !stopped) {
+    const m = jobs.shift();
+    $('#sub .q').textContent = m.user ? `${m.user}：${m.question}` : ''; $('#sub .a').textContent = m.say || '';
+    const a = m.action || 'idle'; const long = ['dance', 'sing', 'play', 'paint'].includes(a); act(a, long ? 0 : 3500);
+    const side = a === 'poem' && m.poem ? showPoem(m.poem) : a === 'paint' && m.paint ? showPaint(m.paint) : null;
+    await speak(m.say || '', m.audio, m.browser_tts);
+    if (a === 'sing' && m.song) await playScore({ notes: m.song.notes, bpm: m.song.bpm, lyrics: m.song.lyrics || [], title: m.song.title });
+    else if (a === 'play' && m.instrument) await playScore({ notes: m.instrument.notes, bpm: m.instrument.bpm, inst: m.instrument.name });
+    else if (a === 'dance') { const dn = pentatonic(32); await playScore({ notes: dn, bpm: 120, inst: 'pipa' }); }
+    if (side) await side;
+    if (long) act('idle', 1);
+    await sleep(500);
+  }
+  busy = false;
+}
+function pentatonic(n) { const s = ['C5','D5','E5','G5','A5','C6']; let i = 2; return Array.from({ length: n }, () => [s[i = Math.max(0, Math.min(5, i + [-1, 1, 1, -1, 2, -2][Math.random() * 6 | 0]))], .5]); }
+
+/* ---------------- 连接中控 ---------------- */
+function connect() {
+  const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/overlay');
+  ws.onmessage = e => { const m = JSON.parse(e.data);
+    if (m.type === 'danmaku') addDm(m);
+    else if (m.type === 'perform') { stopped = false; jobs.push(m); run(); }
+    else if (m.type === 'stop') { stopped = true; jobs.length = 0; speechSynthesis?.cancel(); audioEl?.pause(); master.gain.value = 0; setTimeout(() => master.gain.value = .8, 500); act('idle', 1); }
+    else if (m.type === 'status') { $('#status').textContent = m.operator ? (m.mode === 'paused' ? '⏸ 暂停中' : '● 直播中') : '○ 主播暂离';
+      $('#away').classList.toggle('on', !m.operator || m.mode === 'paused'); } };
+  ws.onclose = () => { $('#status').textContent = '○ 重连中'; setTimeout(connect, 2000); };
+}
+connect();
+window.__demo = m => { jobs.push(m); run(); }; // 调试用
+</script>
+</body>
+</html>
