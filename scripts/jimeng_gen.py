@@ -94,7 +94,7 @@ class Jimeng:
         body = json.dumps(payload, ensure_ascii=False).encode()
         url, headers = sign_headers(action, body, self.ak or "AK", self.sk or "SK")
         if self.dry:
-            shown = {k: (v[:60] + "…" if isinstance(v, list) and v and len(str(v)) > 80 else v) for k, v in payload.items()}
+            shown = {k: (str(v)[:60] + "…" if len(str(v)) > 80 else v) for k, v in payload.items()}
             print("DRY", action, json.dumps(shown, ensure_ascii=False)[:300])
             return {"code": 10000, "data": {"task_id": "dry", "status": "done"}}
         r = self.http.post(url, headers=headers, content=body)
@@ -122,9 +122,14 @@ class Jimeng:
         if self.dry:
             return print("DRY save", path)
         if url_or_b64.startswith("http"):
-            path.write_bytes(self.http.get(url_or_b64, timeout=300).content)
+            r = self.http.get(url_or_b64, timeout=300)
+            r.raise_for_status()  # 下载失败时报错，不覆盖已有的好文件
+            data = r.content
         else:
-            path.write_bytes(base64.b64decode(url_or_b64))
+            data = base64.b64decode(url_or_b64)
+        tmp = path.with_suffix(path.suffix + ".part")
+        tmp.write_bytes(data)
+        tmp.replace(path)
         print("已保存", path)
 
 
