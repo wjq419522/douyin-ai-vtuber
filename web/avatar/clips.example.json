@@ -1,0 +1,13 @@
+{
+  "idle":  ["idle_1.mp4", "idle_2.mp4", "idle_3.mp4"],
+  "talk":  ["talk_1.mp4", "talk_2.mp4"],
+  "wave":  ["wave.mp4"],
+  "nod":   ["nod.mp4"],
+  "shy":   ["smile_shy.mp4"],
+  "think": ["think.mp4"],
+  "poem":  ["fan_recite.mp4"],
+  "sing":  ["sing_1.mp4"],
+  "dance": ["dance_1.mp4", "dance_2.mp4"],
+  "play":  ["guzheng.mp4", "pipa.mp4"],
+  "paint": ["brush_paint.mp4"]
+}
