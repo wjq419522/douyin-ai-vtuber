@@ -17,7 +17,7 @@ import re
 
 import httpx
 
-PERSONA = """你是“云汐”，一位原创的AI虚拟主播（不是真人，也不模仿任何真实人物）。
+PERSONA = """你是“佳垚”，一位原创的AI虚拟主播（不是真人，也不模仿任何真实人物）。
 形象：自然、端庄、大方的东方古典女子（原创），杏眼远山眉、黑发高髻、发簪步摇、浅青色汉服。
 性格：温婉大方、知书达理、有书卷气，亲切不轻佻；擅长诗词、书画、古筝琵琶笛子等乐器、唱歌跳舞。
 直播规范（必须遵守）：
@@ -93,7 +93,7 @@ STORIES = [
 def mock_reply(user: str, text: str) -> dict:
     if "飞花令" in text:
         ch = random.choice("月花春风山水")
-        return {"say": f"飞花令开始！今天的字是「{ch}」，请在公屏发带“{ch}”字的诗句，云汐来点评～", "action": "wave"}
+        return {"say": f"飞花令开始！今天的字是「{ch}」，请在公屏发带“{ch}”字的诗句，佳垚来点评～", "action": "wave"}
     if "典故" in text:
         return {"say": random.choice(STORIES), "action": "think"}
     if text.startswith("（主动节目）") and "画" in text:
@@ -104,7 +104,7 @@ def mock_reply(user: str, text: str) -> dict:
         return {"say": f"送给{user}一首《{p['title']}》：" + "，".join(p["lines"]) + "。", "action": "poem", "poem": p}
     if intent == "paint":
         subject = re.sub(r".*画(一?[幅张个])?", "", text).strip("吧呀啊！!。") or "江南山水"
-        return {"say": f"好呀，云汐给{user}画一幅「{subject}」，稍等片刻～", "action": "paint",
+        return {"say": f"好呀，佳垚给{user}画一幅「{subject}」，稍等片刻～", "action": "paint",
                 "paint": {"prompt": subject, "style": "水墨"}}
     if intent == "sing":
         return {"say": "那我即兴唱一段原创小调～", "action": "sing",
@@ -117,12 +117,12 @@ def mock_reply(user: str, text: str) -> dict:
         ins = pick_instrument(text)
         name = INS_NAME[ins]
         verb = {"dizi": "吹", "xiao": "吹", "erhu": "拉"}.get(ins, "弹")
-        return {"say": f"好呀，云汐{verb}一曲{name}给{user}听～", "action": "play",
+        return {"say": f"好呀，佳垚{verb}一曲{name}给{user}听～", "action": "play",
                 "instrument": {"name": ins, "bpm": 96, "notes": pentatonic_melody(28, text)}}
     if re.search(r"你好|哈喽|hi|hello|来了", text, re.I):
         return {"say": f"欢迎{user}来到直播间～今天想听诗、听曲，还是看我画画？", "action": "wave"}
     if re.search(r"漂亮|好看|美", text):
-        return {"say": f"谢谢{user}夸奖，云汐会害羞的啦～", "action": "shy"}
+        return {"say": f"谢谢{user}夸奖，佳垚会害羞的啦～", "action": "shy"}
     return {"say": f"{user}说得有意思～可以让我作诗、画画、唱歌、跳舞，或者弹古筝琵琶哦！", "action": "nod"}
 
 

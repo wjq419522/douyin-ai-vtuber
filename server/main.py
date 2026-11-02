@@ -1,4 +1,4 @@
-"""AI 虚拟主播「云汐」中控服务。
+"""AI 虚拟主播「佳垚」中控服务。
 
   python -m server.main            # 在项目根目录运行
   overlay（OBS 浏览器源）: http://127.0.0.1:8765/overlay
@@ -34,7 +34,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 AUDIO = ROOT / "runtime_audio"
 AUDIO.mkdir(exist_ok=True)
 
-app = FastAPI(title="AI虚拟主播·云汐")
+app = FastAPI(title="AI虚拟主播·佳垚")
 app.mount("/web", StaticFiles(directory=ROOT / "web"), name="web")
 app.mount("/audio", StaticFiles(directory=AUDIO), name="audio")
 
@@ -129,7 +129,7 @@ async def handle(ev: dict):
             else:
                 return
         elif safety.is_identity_question(text):
-            out = {"say": "我是AI虚拟主播云汐，不是真人哦～直播间由真人运营者负责管理。", "action": "nod"}
+            out = {"say": "我是AI虚拟主播佳垚，不是真人哦～直播间由真人运营者负责管理。", "action": "nod"}
         else:
             mem.log_question(text)
             hint = host.greet_hint(user, info)
@@ -142,7 +142,7 @@ async def handle(ev: dict):
     cat = safety.check_output(said) or (kind == "product" and host.ad_check(said) and "广告法用语")
     if cat:
         await broadcast(consoles, {"type": "log", "level": "block", "text": f"[拦截输出/{cat}] {out.get('say')}"})
-        out = {"say": "嗯…这个问题云汐换个话题聊吧～", "action": "think"}
+        out = {"say": "嗯…这个问题佳垚换个话题聊吧～", "action": "think"}
 
     item = {"id": next(ids), "user": "" if synthetic else user, "text": text, "out": out, "kind": kind}
     if state["mode"] == "review" or kind == "product":   # 带货讲解强制人工审核
@@ -162,7 +162,7 @@ async def proactive():
             continue
         if nxt := host.next_action():
             kind, prompt = nxt
-            await queue.put({"kind": kind, "uid": "__host__", "user": "云汐", "text": prompt})
+            await queue.put({"kind": kind, "uid": "__host__", "user": "佳垚", "text": prompt})
 
 
 async def worker():
@@ -295,7 +295,7 @@ async def ws_console(ws: WebSocket):
                 await send_learning(ws)
             elif t == "product":
                 if pr := host.product_prompt(int(m.get("idx", 0))):
-                    await queue.put({"kind": "product", "uid": "__host__", "user": "云汐", "text": pr})
+                    await queue.put({"kind": "product", "uid": "__host__", "user": "佳垚", "text": pr})
             elif t == "stop":      # 一键急停：清空队列与待审，overlay 立即停止
                 pending.clear()
                 while not queue.empty():
