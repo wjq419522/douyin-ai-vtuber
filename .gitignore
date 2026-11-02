@@ -1,0 +1,4 @@
+runtime_audio/
+runtime_memory.db
+.env
+__pycache__/
