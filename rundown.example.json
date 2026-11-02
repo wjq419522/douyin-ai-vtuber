@@ -1,0 +1,5 @@
+[
+  {"name": "开场", "minutes": 3, "programs": ["poem"]},
+  {"name": "才艺", "minutes": 20, "programs": ["sing", "dance", "play_guzheng", "play_pipa", "play_dizi"]},
+  {"name": "互动", "minutes": 15, "programs": ["quiz", "story", "paint"]}
+]
