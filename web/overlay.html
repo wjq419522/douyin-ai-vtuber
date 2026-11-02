@@ -28,6 +28,10 @@
   #avatar { width:860px; height:1290px; }
   #stage { transition: transform .6s ease }
   body.panel-open #stage { transform: translateX(-250px) scale(.92) }
+  /* 写实真人视频形象（?avatar=video）*/
+  #vstage { position:absolute; left:0; right:0; top:150px; height:1360px; overflow:hidden; transition: transform .6s ease }
+  #vstage video { position:absolute; left:50%; top:0; height:100%; transform:translateX(-50%); opacity:0; transition: opacity .35s ease }
+  body.panel-open #vstage { transform: translateX(-250px) scale(.92) }
   .panel { max-width:600px }
 
   /* ===== 弹幕 ===== */
@@ -213,6 +217,8 @@
 </svg>
 </div>
 
+<div id="vstage" hidden><video id="v1" muted playsinline preload="auto"></video><video id="v2" muted playsinline preload="auto"></video></div>
+
 <div id="poem" class="panel"><div class="t"></div></div>
 <div id="paint" class="panel"><canvas width="1024" height="1024"></canvas><div class="cap"></div></div>
 <div id="score" class="panel"><div class="ins"></div><div class="lyr"></div><div class="bars"></div></div>
@@ -294,7 +300,41 @@ const INST = {
 /* ---------------- 形象控制 ---------------- */
 const av = $('#avatar');
 let actTimer;
-function act(a, ms = 4000) { av.setAttribute('class', 'act-' + a); clearTimeout(actTimer); if (ms) actTimer = setTimeout(() => av.setAttribute('class', ''), ms); }
+function act(a, ms = 4000) {
+  av.setAttribute('class', 'act-' + a); clearTimeout(actTimer); if (ms) actTimer = setTimeout(() => av.setAttribute('class', ''), ms);
+  if (VA.on) vaAct(a);
+}
+
+/* ---------------- 写实真人视频形象 ----------------
+   打开方式：/overlay?avatar=video
+   web/avatar/clips.json 列出每个动作对应的视频片段（同一个原创写实人物、同一机位、同一背景），
+   例如 {"idle":["idle1.mp4","idle2.mp4"],"talk":["talk1.mp4"],"dance":["dance1.mp4"],"play":["guzheng.mp4"],...}
+   说话时：若服务端配置了口型同步服务（LIPSYNC_URL），会播放按本句语音实时生成的口型视频；否则播放通用 talk 片段。 */
+const VA = { on: false, clips: {}, cur: 'idle', front: null, back: null };
+const VA_LOOP = ['idle', 'talk', 'dance', 'sing', 'play', 'paint'];
+async function vaInit() {
+  if (params.get('avatar') !== 'video') return;
+  try {
+    VA.clips = await (await fetch('/web/avatar/clips.json', { cache: 'no-store' })).json();
+    if (!VA.clips.idle?.length) throw new Error('clips.json 缺少 idle 片段');
+    VA.front = $('#v1'); VA.back = $('#v2'); VA.on = true;
+    $('#stage').hidden = true; $('#vstage').hidden = false; vaPlay('idle');
+  } catch (e) { console.warn('写实视频形象未启用，回退到 SVG：', e.message); }
+}
+function vaSrc(name) { return /^(https?:|\/)/.test(name) ? name : '/web/avatar/' + name; }
+function vaPlay(a, src) {
+  const list = VA.clips[a] || (a === 'sing' ? VA.clips.talk : null) || VA.clips.idle;
+  const file = src || list[Math.random() * list.length | 0];
+  const v = VA.back; v.src = vaSrc(file); v.loop = !src && VA_LOOP.includes(a); v.currentTime = 0;
+  v.onended = () => { if (!v.loop) vaPlay(VA.resume || 'idle'); };
+  return v.play().then(() => { v.style.opacity = 1; VA.front.style.opacity = 0; [VA.front, VA.back] = [v, VA.front]; VA.back.pause(); VA.cur = a; })
+    .catch(e => { if (e.name !== 'AbortError') console.warn('视频播放失败', file, e.message); });
+}
+function vaAct(a) {
+  a = a || 'idle';
+  if (VA_LOOP.includes(a)) { VA.resume = a; VA.gesture = null; vaPlay(a); }
+  else { VA.resume = 'idle'; VA.gesture = a; }   // 挥手/点头等短动作：说完话再做，避免被说话片段打断
+}
 setInterval(() => { const e = $('#eyes'); e.style.transform = 'scaleY(.1)'; setTimeout(() => e.style.transform = '', 120); }, 3200 + Math.random() * 1500);
 let speaking = 0, fakeMouth = false;
 const td = new Uint8Array(analyser.fftSize);
@@ -309,7 +349,14 @@ const td = new Uint8Array(analyser.fftSize);
 
 /* ---------------- 语音 ---------------- */
 let audioEl = null;
-function speak(text, url, useBrowser) {
+function speak(text, url, useBrowser, talkVideo) {
+  if (VA.on && text) { const back = VA.cur; VA.resume = back === 'talk' ? 'idle' : back; vaPlay('talk', talkVideo);
+    return speakAudio(text, url, useBrowser).then(() => {
+      if (VA.cur !== 'talk') return;
+      if (VA.gesture && VA.clips[VA.gesture]) { const g = VA.gesture; VA.gesture = null; vaPlay(g); } else vaPlay(VA.resume || 'idle'); }); }
+  return speakAudio(text, url, useBrowser);
+}
+function speakAudio(text, url, useBrowser) {
   return new Promise(res => {
     if (url) {
       audioEl = new Audio(url); audioEl.crossOrigin = 'anonymous';
@@ -407,7 +454,8 @@ async function run() {
     $('#sub .q').textContent = m.user ? `${m.user}：${m.question}` : ''; $('#sub .a').textContent = m.say || '';
     const a = m.action || 'idle'; const long = ['dance', 'sing', 'play', 'paint'].includes(a); act(a, long ? 0 : 3500);
     const side = a === 'poem' && m.poem ? showPoem(m.poem) : a === 'paint' && m.paint ? showPaint(m.paint) : null;
-    await speak(m.say || '', m.audio, m.browser_tts);
+    await speak(m.say || '', m.audio, m.browser_tts, m.talk_video);
+    if (VA.on && long) vaAct(a);
     if (a === 'sing' && m.song) await playScore({ notes: m.song.notes, bpm: m.song.bpm, lyrics: m.song.lyrics || [], title: m.song.title });
     else if (a === 'play' && m.instrument) await playScore({ notes: m.instrument.notes, bpm: m.instrument.bpm, inst: m.instrument.name });
     else if (a === 'dance') { const dn = pentatonic(32); await playScore({ notes: dn, bpm: 120, inst: 'pipa' }); }
@@ -430,6 +478,7 @@ function connect() {
       $('#away').classList.toggle('on', !m.operator || m.mode === 'paused'); } };
   ws.onclose = () => { $('#status').textContent = '○ 重连中'; setTimeout(connect, 2000); };
 }
+vaInit();
 connect();
 window.__demo = m => { jobs.push(m); run(); }; // 调试用
 </script>
