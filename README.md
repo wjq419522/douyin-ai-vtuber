@@ -23,6 +23,13 @@ python -m server.main
 
 ---
 
+### 写实真人形象
+
+直播画面地址改成 `http://127.0.0.1:8765/overlay?avatar=video`，就会用 `web/avatar/` 里的写实视频片段代替动漫形象：按弹幕切换待机、说话、挥手、跳舞、弹琴、作画等片段；配置了口型同步服务（`LIPSYNC_URL`）时，说话会播放按本句语音实时生成的口型视频。
+人物怎么做（原创写实面孔、动作片段、口型、音色）和合规要求见 [docs/realistic-avatar.md](docs/realistic-avatar.md)。
+
+---
+
 ## 2. 架构
 
 ```

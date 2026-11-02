@@ -14,7 +14,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import douyin, safety
+from . import douyin, lipsync, safety
 from .brain import Brain, generate_image
 from .host import Host
 from .memory import Memory
@@ -97,6 +97,7 @@ async def perform(item: dict):
         p = out.get("paint", {})
         out["paint"]["image"] = await generate_image(p.get("prompt", "山水"), p.get("style", "水墨"))
     out["audio"] = await tts(out.get("say", ""), item["id"])
+    out["talk_video"] = await lipsync.render(out["audio"]) if out["audio"] else None
     out["browser_tts"] = state["tts"] == "browser" or (state["tts"] == "edge" and not out["audio"])
     await broadcast(overlays, {"type": "perform", "id": item["id"], "user": item["user"],
                                "question": item["text"], **out})
